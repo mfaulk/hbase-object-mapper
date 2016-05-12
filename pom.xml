@@ -36,6 +36,10 @@
     </developers>
     <repositories>
         <repository>
+            <id>jitpack.io</id>
+            <url>https://jitpack.io</url>
+        </repository>
+        <repository>
             <id>cloudera-repos</id>
             <name>Cloudera Repos</name>
             <url>https://repository.cloudera.com/artifactory/cloudera-repos/</url>
