@@ -11,6 +11,7 @@ import com.google.common.collect.Sets;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.*;
 import org.apache.hadoop.hbase.client.HBaseAdmin;
+import org.apache.hadoop.hbase.util.Bytes;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -143,22 +144,30 @@ public class TestsAbstractHBDAO {
     }
 
     public void testHBaseDAO() throws IOException {
-        String[] rowKeys = new String[testObjs.size()];
-        Map<String, Map<String, Object>> expectedFieldValues = new HashMap<String, Map<String, Object>>();
-        for (int i = 0; i < testObjs.size(); i++) {
-            Citizen e = testObjs.get(i);
+        List<AbstractHBDAO.RowKey> rowKeys = new ArrayList<>(testObjs.size());
+
+        // Interpretation of this mapping?
+        // field name ---> { rowKey ---> fieldValue ?
+        Map<String, Map<AbstractHBDAO.RowKey, Object>> expectedFieldValues = new HashMap<>();
+        for (Citizen e : testObjs) {
+            System.out.println(e.getName());
             try {
-                final String rowKey = citizenDao.persist(e);
-                rowKeys[i] = rowKey;
-                Citizen pe = citizenDao.get(rowKey);
+                final byte[] rowKeyBytes = citizenDao.persist(e);
+                AbstractHBDAO.RowKey rowKey = new AbstractHBDAO.RowKey(rowKeyBytes);
+                rowKeys.add(rowKey);
+                Citizen pe = citizenDao.get(rowKey.bytes());
                 assertEquals("Entry got corrupted upon persisting and fetching back", e, pe);
+                // For each field...
                 for (String f : citizenDao.getFields()) {
+                    System.out.println(f);
                     try {
                         Field field = Citizen.class.getDeclaredField(f);
-                        WrappedHBColumn hbColumn = new WrappedHBColumn(field);
                         field.setAccessible(true);
-                        final Object actual = citizenDao.fetchFieldValue(rowKey, f);
+                        WrappedHBColumn hbColumn = new WrappedHBColumn(field);
                         Object expected = field.get(e);
+
+                        final Object actual = citizenDao.fetchFieldValue(rowKey.bytes(), f);
+
                         if (hbColumn.isMultiVersioned()) {
                             NavigableMap columnHistory = ((NavigableMap) field.get(e));
                             if (columnHistory != null && columnHistory.size() > 0) {
@@ -168,7 +177,7 @@ public class TestsAbstractHBDAO {
                         assertEquals("Field data corrupted upon persisting and fetching back", expected, actual);
                         if (actual == null) continue;
                         if (!expectedFieldValues.containsKey(f)) {
-                            expectedFieldValues.put(f, new HashMap<String, Object>() {
+                            expectedFieldValues.put(f, new HashMap<AbstractHBDAO.RowKey, Object>() {
                                 {
                                     put(rowKey, actual);
                                 }
@@ -184,24 +193,28 @@ public class TestsAbstractHBDAO {
                         fail("Field missing: " + f);
                     } catch (IOException ioex) {
                         ioex.printStackTrace();
-                        fail("Could not fetch field '" + f + "' for row '" + rowKey + "'");
+                        fail("Could not fetch field '" + f + "' for row '" + rowKey.bytes() + "'");
                     }
                 }
             } catch (IOException ioex) {
                 fail();
             }
         }
-        List<Citizen> citizens = citizenDao.get(rowKeys[0], rowKeys[rowKeys.length - 1]);
+
+        List<Citizen> citizens = citizenDao.get(rowKeys.get(0).bytes(), rowKeys.get(rowKeys.size() - 1).bytes());
         for (int i = 0; i < citizens.size(); i++) {
             assertEquals("When retrieved in bulk (range scan), we have unexpected entry", citizens.get(i), testObjs.get(i));
         }
         for (String f : citizenDao.getFields()) {
-            Map<String, Object> actualFieldValues = citizenDao.fetchFieldValues(rowKeys, f);
-            Map<String, Object> actualFieldValuesScanned = citizenDao.fetchFieldValues("A", "z", f);
-            assertTrue(String.format("Invalid data returned when values for column \"%s\" were fetched in bulk\nExpected: %s\nActual: %s", f, expectedFieldValues.get(f), actualFieldValues), TestUtil.mapEquals(actualFieldValues, expectedFieldValues.get(f)));
+            // rowKey ---> fieldValue
+            Map<AbstractHBDAO.RowKey, Object> actualFieldValues = citizenDao.fetchFieldValues(rowKeys, f);
+            // rowKey ---> fieldValue
+            Map<AbstractHBDAO.RowKey, Object> actualFieldValuesScanned = citizenDao.fetchFieldValues("A".getBytes(), "z".getBytes(), f);
+            assertTrue(String.format("Invalid data returned when values for column \"%s\" were fetched in bulk\nExpected: %s\nActual: %s",
+                    f, expectedFieldValues.get(f), actualFieldValues), TestUtil.mapEquals(actualFieldValues, expectedFieldValues.get(f)));
             assertTrue("Difference between 'bulk fetch by array of row keys' and 'bulk fetch by range of row keys'", TestUtil.mapEquals(actualFieldValues, actualFieldValuesScanned));
         }
-        Map<String, Object> actualSalaries = citizenDao.fetchFieldValues(rowKeys, "sal");
+        Map<AbstractHBDAO.RowKey, Object> actualSalaries = citizenDao.fetchFieldValues(rowKeys, "sal");
         long actualSumOfSalaries = 0;
         for (Object s : actualSalaries.values()) {
             actualSumOfSalaries += s == null ? 0 : (Integer) s;
@@ -211,8 +224,8 @@ public class TestsAbstractHBDAO {
             expectedSumOfSalaries += c.getSal() == null ? 0 : c.getSal();
         }
         assertEquals(expectedSumOfSalaries, actualSumOfSalaries);
-        assertArrayEquals("Data mismatch between single and bulk 'get' calls", testObjs.toArray(), citizenDao.get(rowKeys));
-        assertEquals("Data mismatch between List and array bulk variants of 'get' calls", testObjs, citizenDao.get(Arrays.asList(rowKeys)));
+        assertArrayEquals("Data mismatch between single and bulk 'get' calls", testObjs.toArray(), citizenDao.get(rowKeys).toArray());
+        assertEquals("Data mismatch between List and array bulk variants of 'get' calls", testObjs, citizenDao.get(rowKeys));
         Citizen citizenToBeDeleted = testObjs.get(0);
         citizenDao.delete(citizenToBeDeleted);
         assertNull("Record was not deleted: " + citizenToBeDeleted, citizenDao.get(citizenToBeDeleted.composeRowKey()));
@@ -232,12 +245,12 @@ public class TestsAbstractHBDAO {
             objs.add(new CrawlNoVersion("key").setF1(n));
         }
         crawlNoVersionDAO.persist(objs);
-        Crawl crawl = crawlDAO.get("key", NUM_VERSIONS);
+        Crawl crawl = crawlDAO.get("key".getBytes(), NUM_VERSIONS);
         assertEquals("Issue with version history implementation when written as unversioned and read as versioned", 1.0, crawl.getF1().values().iterator().next(), 1e-9);
-        crawlDAO.delete("key");
-        Crawl versioned = crawlDAO.get("key");
+        crawlDAO.delete("key".getBytes());
+        Crawl versioned = crawlDAO.get("key".getBytes());
         assertNull("Deleted row (with key " + versioned + ") still exists when accessed as versioned DAO", versioned);
-        CrawlNoVersion versionless = crawlNoVersionDAO.get("key");
+        CrawlNoVersion versionless = crawlNoVersionDAO.get("key".getBytes());
         assertNull("Deleted row (with key " + versionless + ") still exists when accessed as versionless DAO", versionless);
         // Written as versioned, read as unversioned+versioned
         Crawl crawl2 = new Crawl("key2");
@@ -248,34 +261,34 @@ public class TestsAbstractHBDAO {
             i++;
         }
         crawlDAO.persist(crawl2);
-        CrawlNoVersion crawlNoVersion = crawlNoVersionDAO.get("key2");
+        CrawlNoVersion crawlNoVersion = crawlNoVersionDAO.get("key2".getBytes());
         assertEquals("Entry with the highest version (i.e. timestamp) isn't the one that was returned by DAO get", crawlNoVersion.getF1(), testNumbers[testNumbers.length - 1]);
-        assertArrayEquals("Issue with version history implementation when written as versioned and read as unversioned", testNumbersOfRange, crawlDAO.get("key2", NUM_VERSIONS).getF1().values().toArray());
+        assertArrayEquals("Issue with version history implementation when written as versioned and read as unversioned", testNumbersOfRange, crawlDAO.get("key2".getBytes(), NUM_VERSIONS).getF1().values().toArray());
         // Deletion tests:
 
         // Written as unversioned, deleted as unversioned:
         final String deleteKey1 = "write_unversioned__delete_unversioned";
         crawlNoVersionDAO.persist(new Crawl(deleteKey1).addF1(10.01));
-        crawlNoVersionDAO.delete(deleteKey1);
-        assertNull("Row with key '" + deleteKey1 + "' exists, when written through unversioned DAO and deleted through unversioned DAO!", crawlNoVersionDAO.get(deleteKey1));
+        crawlNoVersionDAO.delete(deleteKey1.getBytes());
+        assertNull("Row with key '" + deleteKey1 + "' exists, when written through unversioned DAO and deleted through unversioned DAO!", crawlNoVersionDAO.get(deleteKey1.getBytes()));
 
         // Written as versioned, deleted as versioned:
         final String deleteKey2 = "write_versioned__delete_versioned";
         crawlDAO.persist(new Crawl(deleteKey2).addF1(10.02));
-        crawlDAO.delete(deleteKey2);
-        assertNull("Row with key '" + deleteKey2 + "' exists, when written through versioned DAO and deleted through versioned DAO!", crawlNoVersionDAO.get(deleteKey2));
+        crawlDAO.delete(deleteKey2.getBytes());
+        assertNull("Row with key '" + deleteKey2 + "' exists, when written through versioned DAO and deleted through versioned DAO!", crawlNoVersionDAO.get(deleteKey2.getBytes()));
 
         // Written as unversioned, deleted as versioned:
         final String deleteKey3 = "write_unversioned__delete_versioned";
         crawlNoVersionDAO.persist(new Crawl(deleteKey3).addF1(10.03));
-        crawlDAO.delete(deleteKey3);
-        assertNull("Row with key '" + deleteKey3 + "' exists, when written through unversioned DAO and deleted through versioned DAO!", crawlNoVersionDAO.get(deleteKey3));
+        crawlDAO.delete(deleteKey3.getBytes());
+        assertNull("Row with key '" + deleteKey3 + "' exists, when written through unversioned DAO and deleted through versioned DAO!", crawlNoVersionDAO.get(deleteKey3.getBytes()));
 
         // Written as versioned, deleted as unversioned:
         final String deleteKey4 = "write_versioned__delete_unversioned";
         crawlDAO.persist(new Crawl(deleteKey4).addF1(10.04));
-        crawlNoVersionDAO.delete(deleteKey4);
-        assertNull("Row with key '" + deleteKey4 + "' exists, when written through versioned DAO and deleted through unversioned DAO!", crawlNoVersionDAO.get(deleteKey4));
+        crawlNoVersionDAO.delete(deleteKey4.getBytes());
+        assertNull("Row with key '" + deleteKey4 + "' exists, when written through versioned DAO and deleted through unversioned DAO!", crawlNoVersionDAO.get(deleteKey4.getBytes()));
     }
 
 

@@ -4,6 +4,8 @@ import com.flipkart.hbaseobjectmapper.HBColumn;
 import com.flipkart.hbaseobjectmapper.HBRecord;
 import com.flipkart.hbaseobjectmapper.HBRowKey;
 
+import java.nio.ByteBuffer;
+
 public class UninstantiatableClass implements HBRecord {
     @HBRowKey
     private Integer uid;
@@ -15,12 +17,17 @@ public class UninstantiatableClass implements HBRecord {
     }
 
     @Override
-    public String composeRowKey() {
-        return uid.toString();
+    public byte[] composeRowKey() {
+        int value = uid.intValue();
+        return new byte[]{
+                (byte) (value >>> 24),
+                (byte) (value >>> 16),
+                (byte) (value >>> 8),
+                (byte) value};
     }
 
     @Override
-    public void parseRowKey(String rowKey) {
-        this.uid = Integer.valueOf(rowKey);
+    public void parseRowKey(byte[] rowKey) {
+        this.uid = ByteBuffer.wrap(rowKey).getInt();
     }
 }

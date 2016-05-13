@@ -10,15 +10,15 @@ import java.util.NavigableMap;
 public class ClassesWithFieldIncomptibleWithHBColumnMultiVersion {
     public static class NotMap implements HBRecord {
         @HBRowKey
-        protected String key = "key";
+        protected byte[] key = "key".getBytes();
 
         @Override
-        public String composeRowKey() {
+        public byte[] composeRowKey() {
             return key;
         }
 
         @Override
-        public void parseRowKey(String rowKey) {
+        public void parseRowKey(byte[] rowKey) {
             this.key = rowKey;
         }
 
@@ -28,15 +28,15 @@ public class ClassesWithFieldIncomptibleWithHBColumnMultiVersion {
 
     public static class NotNavigableMap implements HBRecord {
         @HBRowKey
-        protected String key = "key";
+        protected byte[] key = "key".getBytes();
 
         @Override
-        public String composeRowKey() {
+        public byte[] composeRowKey() {
             return key;
         }
 
         @Override
-        public void parseRowKey(String rowKey) {
+        public void parseRowKey(byte[] rowKey) {
             this.key = rowKey;
         }
 
@@ -46,15 +46,15 @@ public class ClassesWithFieldIncomptibleWithHBColumnMultiVersion {
 
     public static class EntryKeyNotLong implements HBRecord {
         @HBRowKey
-        protected String key = "key";
+        protected byte[] key = "key".getBytes();
 
         @Override
-        public String composeRowKey() {
+        public byte[] composeRowKey() {
             return key;
         }
 
         @Override
-        public void parseRowKey(String rowKey) {
+        public void parseRowKey(byte[] rowKey) {
             this.key = rowKey;
         }
 

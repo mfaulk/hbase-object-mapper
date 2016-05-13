@@ -12,22 +12,22 @@ import lombok.ToString;
 public class CitizenSummary implements HBRecord {
 
     @HBRowKey
-    private String key;
+    private byte[] key;
 
     @HBColumn(family = "a", column = "average_age")
     private Float averageAge;
 
     public CitizenSummary() {
-        key = "summary";
+        key = "summary".getBytes();
     }
 
     @Override
-    public String composeRowKey() {
+    public byte[] composeRowKey() {
         return key;
     }
 
     @Override
-    public void parseRowKey(String rowKey) {
+    public void parseRowKey(byte[] rowKey) {
         key = rowKey;
     }
 

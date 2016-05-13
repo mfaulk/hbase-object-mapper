@@ -6,15 +6,15 @@ import com.flipkart.hbaseobjectmapper.HBRowKey;
 
 public class ClassWithNoEmptyConstructor implements HBRecord {
     @HBRowKey
-    protected String key = "key";
+    protected byte[] key = "key".getBytes();
 
     @Override
-    public String composeRowKey() {
+    public byte[] composeRowKey() {
         return key;
     }
 
     @Override
-    public void parseRowKey(String rowKey) {
+    public void parseRowKey(byte[] rowKey) {
         this.key = rowKey;
     }
 

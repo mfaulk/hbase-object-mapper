@@ -8,7 +8,7 @@ public class Singleton implements HBRecord {
     private static Singleton ourInstance = new Singleton();
 
     @HBRowKey
-    protected String key = "key";
+    protected byte[] key = "key".getBytes();
 
     @HBColumn(family = "f", column = "c")
     String column;
@@ -22,12 +22,12 @@ public class Singleton implements HBRecord {
     }
 
     @Override
-    public String composeRowKey() {
+    public byte[] composeRowKey() {
         return key;
     }
 
     @Override
-    public void parseRowKey(String rowKey) {
+    public void parseRowKey(byte[] rowKey) {
         this.key = rowKey;
     }
 

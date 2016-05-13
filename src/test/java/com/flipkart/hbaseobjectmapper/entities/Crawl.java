@@ -13,7 +13,7 @@ import java.util.TreeMap;
 @ToString
 public class Crawl implements HBRecord {
     @HBRowKey
-    String key;
+    byte[] key;
 
     @HBColumnMultiVersion(family = "a", column = "f1")
     NavigableMap<Long, Double> f1;
@@ -23,17 +23,17 @@ public class Crawl implements HBRecord {
     }
 
     public Crawl(String key) {
-        this.key = key;
+        this.key = key.getBytes();
         this.f1 = new TreeMap<Long, Double>();
     }
 
     @Override
-    public String composeRowKey() {
+    public byte[] composeRowKey() {
         return key;
     }
 
     @Override
-    public void parseRowKey(String rowKey) {
+    public void parseRowKey(byte[] rowKey) {
         this.key = rowKey;
     }
 

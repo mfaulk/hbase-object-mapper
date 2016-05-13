@@ -61,7 +61,7 @@ public class TestHBObjectMapper {
     public void testResultWithRow(HBRecord p) {
         long start, end;
         Result result = hbMapper.writeValueAsResult(Arrays.asList(p)).get(0);
-        ImmutableBytesWritable rowKey = Util.strToIbw(p.composeRowKey());
+        ImmutableBytesWritable rowKey = new ImmutableBytesWritable(p.composeRowKey());
         start = System.currentTimeMillis();
         Citizen pFromResult = hbMapper.readValue(rowKey, result, Citizen.class);
         end = System.currentTimeMillis();
@@ -85,7 +85,7 @@ public class TestHBObjectMapper {
     public void testPutWithRow(HBRecord p) {
         long start, end;
         Put put = hbMapper.writeValueAsPut(p);
-        ImmutableBytesWritable rowKey = Util.strToIbw(p.composeRowKey());
+        ImmutableBytesWritable rowKey = new ImmutableBytesWritable(p.composeRowKey());
         start = System.currentTimeMillis();
         Citizen pFromPut = hbMapper.readValue(rowKey, put, Citizen.class);
         end = System.currentTimeMillis();
@@ -213,12 +213,12 @@ public class TestHBObjectMapper {
     public void testGetRowKey() {
         ImmutableBytesWritable rowKey = hbMapper.getRowKey(new HBRecord() {
             @Override
-            public String composeRowKey() {
-                return "rowkey";
+            public byte[] composeRowKey() {
+                return "rowkey".getBytes();
             }
 
             @Override
-            public void parseRowKey(String rowKey) {
+            public void parseRowKey(byte[] rowKey) {
 
             }
         });
@@ -226,12 +226,12 @@ public class TestHBObjectMapper {
         try {
             hbMapper.getRowKey(new HBRecord() {
                 @Override
-                public String composeRowKey() {
+                public byte[] composeRowKey() {
                     return null;
                 }
 
                 @Override
-                public void parseRowKey(String rowKey) {
+                public void parseRowKey(byte[] rowKey) {
 
                 }
             });
@@ -242,12 +242,12 @@ public class TestHBObjectMapper {
         try {
             hbMapper.getRowKey(new HBRecord() {
                 @Override
-                public String composeRowKey() {
+                public byte[] composeRowKey() {
                     throw new RuntimeException("Some blah");
                 }
 
                 @Override
-                public void parseRowKey(String rowKey) {
+                public void parseRowKey(byte[] rowKey) {
 
                 }
             });

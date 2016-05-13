@@ -3,10 +3,12 @@ package com.flipkart.hbaseobjectmapper.entities;
 import com.flipkart.hbaseobjectmapper.*;
 import lombok.EqualsAndHashCode;
 import lombok.ToString;
+import org.apache.commons.lang.ArrayUtils;
+import org.apache.hadoop.hbase.util.Bytes;
 
 import java.math.BigDecimal;
-import java.util.Map;
-import java.util.NavigableMap;
+import java.nio.ByteBuffer;
+import java.util.*;
 
 @ToString
 @EqualsAndHashCode
@@ -43,6 +45,35 @@ public class Citizen implements HBRecord {
     @HBColumn(family = "optional", column = "dependents")
     private Dependents dependents;
 
+    public static byte[] intToByteArray(int value) {
+        ByteBuffer b = ByteBuffer.allocate(4);
+        //b.order(ByteOrder.BIG_ENDIAN); // optional, the initial order of a byte buffer is always BIG_ENDIAN.
+        b.putInt(value);
+        return b.array();
+    }
+
+    public static List<byte[]> splitTokens(byte[] array, byte[] delimiter) {
+        List<byte[]> byteArrays = new LinkedList<>();
+        if (delimiter.length == 0) {
+            return byteArrays;
+        }
+        int begin = 0;
+
+        outer:
+        for (int i = 0; i < array.length - delimiter.length + 1; i++) {
+            for (int j = 0; j < delimiter.length; j++) {
+                if (array[i + j] != delimiter[j]) {
+                    continue outer;
+                }
+            }
+            byteArrays.add(Arrays.copyOfRange(array, begin, i));
+            begin = i + delimiter.length;
+        }
+        byteArrays.add(Arrays.copyOfRange(array, begin, array.length));
+        return byteArrays;
+    }
+
+
     public Citizen() {
     }
 
@@ -64,14 +95,26 @@ public class Citizen implements HBRecord {
         this.pincode = pincode;
     }
 
-    public String composeRowKey() {
-        return String.format("%s%s%d", countryCode, KEY_DELIM, uid);
+    public byte[] composeRowKey() {
+        byte[] key = null;
+        List<byte[]> parts = new ArrayList<byte[]>();
+        parts.add(countryCode.getBytes());
+        parts.add(KEY_DELIM.getBytes());
+        parts.add(intToByteArray(uid));
+
+        for(byte[] part : parts) {
+            key = ArrayUtils.addAll(key, part);
+        }
+        return key;
     }
 
-    public void parseRowKey(String rowKey) {
-        String[] pieces = rowKey.split(KEY_DELIM);
-        this.countryCode = pieces[0];
-        this.uid = Integer.parseInt(pieces[1]);
+    public void parseRowKey(byte[] rowKeyBytes) {
+        List<byte[]> tokens = splitTokens(rowKeyBytes, KEY_DELIM.getBytes());
+        if(tokens.size() == 2) {
+            this.countryCode = Bytes.toString(tokens.get(0));
+            this.uid = Bytes.toInt(tokens.get(1));
+        }
+        System.out.println('.');
     }
 
     // Getter methods:

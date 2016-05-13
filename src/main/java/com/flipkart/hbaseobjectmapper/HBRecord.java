@@ -1,5 +1,7 @@
 package com.flipkart.hbaseobjectmapper;
 
+import org.apache.hadoop.hbase.util.Bytes;
+
 /**
  * Entities that need to be mapped to HBase table need to implement this interface
  */
@@ -8,15 +10,10 @@ public interface HBRecord {
     /**
      * Forms the row key required for HBase from class variables
      *
-     * @return Row key as string
+     * @return Row key
      */
-    String composeRowKey();
+    public byte[] composeRowKey();
 
-    /**
-     * Assigns the class variables from row key string (from HBase) provided
-     *
-     * @param rowKey Row key  as a string
-     */
-    void parseRowKey(String rowKey);
+    public void parseRowKey(byte[] bytes);
 
 }

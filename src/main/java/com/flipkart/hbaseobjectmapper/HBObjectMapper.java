@@ -76,7 +76,6 @@ public class HBObjectMapper {
     }
 
     private <T extends HBRecord> T mapToObj(byte[] rowKeyBytes, NavigableMap<byte[], NavigableMap<byte[], NavigableMap<Long, byte[]>>> map, Class<T> clazz) {
-        String rowKey = Bytes.toString(rowKeyBytes);
         T obj;
         validateHBClass(clazz);
         try {
@@ -85,9 +84,9 @@ public class HBObjectMapper {
             throw new ObjectNotInstantiatableException("Error while instantiating empty constructor of " + clazz.getName(), ex);
         }
         try {
-            obj.parseRowKey(rowKey);
+            obj.parseRowKey(rowKeyBytes);
         } catch (Exception ex) {
-            throw new RowKeyCouldNotBeParsedException(String.format("Supplied row key \"%s\" could not be parsed", rowKey), ex);
+            throw new RowKeyCouldNotBeParsedException(String.format("Supplied row key \"%s\" could not be parsed", rowKeyBytes), ex);
         }
         for (Field field : clazz.getDeclaredFields()) {
             WrappedHBColumn hbColumn = new WrappedHBColumn(field);
@@ -597,16 +596,16 @@ public class HBObjectMapper {
     }
 
     private static byte[] composeRowKey(HBRecord obj) {
-        String rowKey;
+        byte[] rowKey;
         try {
             rowKey = obj.composeRowKey();
         } catch (Exception ex) {
             throw new RowKeyCantBeComposedException(ex);
         }
-        if (rowKey == null || rowKey.isEmpty()) {
+        if (rowKey == null || rowKey.length == 0) {
             throw new RowKeyCantBeEmptyException();
         }
-        return Bytes.toBytes(rowKey);
+        return rowKey;
     }
 
     /**

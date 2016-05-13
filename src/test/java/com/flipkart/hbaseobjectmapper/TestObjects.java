@@ -24,7 +24,7 @@ public class TestObjects {
                     put("a", 1);
                     put("b", 1);
                 }
-            }, new Dependents(121, Arrays.asList(122, 123))),
+            },new Dependents(121, Arrays.asList(122, 123))),
             new Citizen("IND", 102, "Sathish", (short) 28, null, false, 2.3f, 4.33, -34L, new BigDecimal(100), 560034, null, new HashMap<String, Integer>(), new Dependents(131, null)),
             new Citizen("IND", 103, "Akshay", (short) -1, 50000, false, null, 4.33e34, 34L, null, 560034, null, null, null),
             new Citizen("IND", 104, "Ananda", (short) 5, 30000, null, -2.3f, 4.33, 34L, new BigDecimal(1e50), 560034, null, null, new Dependents()),
