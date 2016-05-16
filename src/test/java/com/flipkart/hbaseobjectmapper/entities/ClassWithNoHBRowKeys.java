@@ -5,7 +5,7 @@ import com.flipkart.hbaseobjectmapper.HBRecord;
 import com.flipkart.hbaseobjectmapper.HBRowKey;
 
 public class ClassWithNoHBRowKeys implements HBRecord {
-    @HBRowKey
+    // No HBRowKey Annotation.
     protected byte[] key = "key".getBytes();
 
     @Override

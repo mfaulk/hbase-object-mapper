@@ -6,7 +6,9 @@ import org.apache.hadoop.hbase.client.Put;
 import org.apache.hadoop.hbase.client.Result;
 import org.apache.hadoop.hbase.io.ImmutableBytesWritable;
 import org.javatuples.Triplet;
+import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.ExpectedException;
 
 import java.util.*;
 
@@ -33,6 +35,9 @@ public class TestHBObjectMapper {
 
     Result someResult = hbMapper.writeValueAsResult(validObjs.get(0));
     Put somePut = hbMapper.writeValueAsPut(validObjs.get(0));
+
+    @Rule
+    public ExpectedException thrown = ExpectedException.none();
 
     @Test
     public void testHBObjectMapper() {
@@ -96,12 +101,8 @@ public class TestHBObjectMapper {
     @Test
     public void testInvalidRowKey() {
         Citizen e = TestObjects.validObjs.get(0);
-        try {
-            hbMapper.readValue("invalid row key", hbMapper.writeValueAsPut(e), Citizen.class);
-            fail("Invalid row key should've thrown " + RowKeyCouldNotBeParsedException.class.getName());
-        } catch (RowKeyCouldNotBeParsedException ex) {
-            System.out.println("For a simulate HBase row with invalid row key, below Exception was thrown as expected:\n" + ex.getMessage() + "\n");
-        }
+        thrown.expect(RowKeyCouldNotBeParsedException.class);
+        hbMapper.readValue(new RowKey("invalid row key".getBytes()), hbMapper.writeValueAsPut(e), Citizen.class);
     }
 
     @Test
@@ -167,6 +168,15 @@ public class TestHBObjectMapper {
                 fail("Same error message for different invalid inputs");
             }
         }
+    }
+
+
+    @Test
+    public void testNullRowKeyField() {
+        // HBRecord with null row key field
+        HBRecord citizen = new Citizen(null, -2, "row key field null 1", null, null, null, null, null, null, null, null, null, null, null);
+        thrown.expect(HBRowKeyFieldCantBeNullException.class);
+        hbMapper.writeValueAsResult(citizen);
     }
 
     @Test

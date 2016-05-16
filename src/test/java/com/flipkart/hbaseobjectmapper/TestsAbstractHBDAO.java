@@ -144,22 +144,17 @@ public class TestsAbstractHBDAO {
     }
 
     public void testHBaseDAO() throws IOException {
-        List<AbstractHBDAO.RowKey> rowKeys = new ArrayList<>(testObjs.size());
-
-        // Interpretation of this mapping?
-        // field name ---> { rowKey ---> fieldValue ?
-        Map<String, Map<AbstractHBDAO.RowKey, Object>> expectedFieldValues = new HashMap<>();
+        List<RowKey> rowKeys = new ArrayList<>(testObjs.size());
+        // field name ---> { rowKey ---> fieldValue }
+        Map<String, Map<RowKey, Object>> expectedFieldValues = new HashMap<>();
         for (Citizen e : testObjs) {
-            System.out.println(e.getName());
             try {
                 final byte[] rowKeyBytes = citizenDao.persist(e);
-                AbstractHBDAO.RowKey rowKey = new AbstractHBDAO.RowKey(rowKeyBytes);
+                RowKey rowKey = new RowKey(rowKeyBytes);
                 rowKeys.add(rowKey);
                 Citizen pe = citizenDao.get(rowKey.bytes());
                 assertEquals("Entry got corrupted upon persisting and fetching back", e, pe);
-                // For each field...
                 for (String f : citizenDao.getFields()) {
-                    System.out.println(f);
                     try {
                         Field field = Citizen.class.getDeclaredField(f);
                         field.setAccessible(true);
@@ -177,7 +172,7 @@ public class TestsAbstractHBDAO {
                         assertEquals("Field data corrupted upon persisting and fetching back", expected, actual);
                         if (actual == null) continue;
                         if (!expectedFieldValues.containsKey(f)) {
-                            expectedFieldValues.put(f, new HashMap<AbstractHBDAO.RowKey, Object>() {
+                            expectedFieldValues.put(f, new HashMap<RowKey, Object>() {
                                 {
                                     put(rowKey, actual);
                                 }
@@ -207,14 +202,14 @@ public class TestsAbstractHBDAO {
         }
         for (String f : citizenDao.getFields()) {
             // rowKey ---> fieldValue
-            Map<AbstractHBDAO.RowKey, Object> actualFieldValues = citizenDao.fetchFieldValues(rowKeys, f);
+            Map<RowKey, Object> actualFieldValues = citizenDao.fetchFieldValues(rowKeys, f);
             // rowKey ---> fieldValue
-            Map<AbstractHBDAO.RowKey, Object> actualFieldValuesScanned = citizenDao.fetchFieldValues("A".getBytes(), "z".getBytes(), f);
+            Map<RowKey, Object> actualFieldValuesScanned = citizenDao.fetchFieldValues("A".getBytes(), "z".getBytes(), f);
             assertTrue(String.format("Invalid data returned when values for column \"%s\" were fetched in bulk\nExpected: %s\nActual: %s",
                     f, expectedFieldValues.get(f), actualFieldValues), TestUtil.mapEquals(actualFieldValues, expectedFieldValues.get(f)));
             assertTrue("Difference between 'bulk fetch by array of row keys' and 'bulk fetch by range of row keys'", TestUtil.mapEquals(actualFieldValues, actualFieldValuesScanned));
         }
-        Map<AbstractHBDAO.RowKey, Object> actualSalaries = citizenDao.fetchFieldValues(rowKeys, "sal");
+        Map<RowKey, Object> actualSalaries = citizenDao.fetchFieldValues(rowKeys, "sal");
         long actualSumOfSalaries = 0;
         for (Object s : actualSalaries.values()) {
             actualSumOfSalaries += s == null ? 0 : (Integer) s;

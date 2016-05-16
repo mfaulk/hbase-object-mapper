@@ -75,7 +75,14 @@ public class HBObjectMapper {
         }
     }
 
-    private <T extends HBRecord> T mapToObj(byte[] rowKeyBytes, NavigableMap<byte[], NavigableMap<byte[], NavigableMap<Long, byte[]>>> map, Class<T> clazz) {
+    /**
+     * @param rowKey
+     * @param map    Map of families to all versions of its qualifiers and values.
+     * @param clazz
+     * @param <T>
+     * @return
+     */
+    private <T extends HBRecord> T mapToObj(RowKey rowKey, NavigableMap<byte[], NavigableMap<byte[], NavigableMap<Long, byte[]>>> map, Class<T> clazz) {
         T obj;
         validateHBClass(clazz);
         try {
@@ -84,9 +91,9 @@ public class HBObjectMapper {
             throw new ObjectNotInstantiatableException("Error while instantiating empty constructor of " + clazz.getName(), ex);
         }
         try {
-            obj.parseRowKey(rowKeyBytes);
+            obj.parseRowKey(rowKey.bytes());
         } catch (Exception ex) {
-            throw new RowKeyCouldNotBeParsedException(String.format("Supplied row key \"%s\" could not be parsed", rowKeyBytes), ex);
+            throw new RowKeyCouldNotBeParsedException(String.format("Supplied row key \"%s\" could not be parsed", rowKey.bytes()), ex);
         }
         for (Field field : clazz.getDeclaredFields()) {
             WrappedHBColumn hbColumn = new WrappedHBColumn(field);
@@ -231,9 +238,13 @@ public class HBObjectMapper {
         for (Field field : clazz.getDeclaredFields()) {
             WrappedHBColumn hbColumn = new WrappedHBColumn(field);
             boolean isRowKey = field.isAnnotationPresent(HBRowKey.class);
+
             if (!hbColumn.isPresent() && !isRowKey)
                 continue;
+
             if (isRowKey && isFieldNull(field, obj)) {
+                boolean isANull = isFieldNull(field, obj);
+                System.out.println("isRowKey and field is null");
                 throw new HBRowKeyFieldCantBeNullException("Field " + field.getName() + " is null (fields part of row key cannot be null)");
             }
             if (hbColumn.isSingleVersioned()) {
@@ -353,7 +364,7 @@ public class HBObjectMapper {
      * @param obj bean-like object (of type that extends {@link HBRecord})
      * @return HBase's {@link Result} object
      */
-    public Result writeValueAsResult(HBRecord obj) {
+    public Result writeValueAsResult(HBRecord obj) throws HBRowKeyFieldCantBeNullException {
         byte[] row = composeRowKey(obj);
         List<KeyValue> keyValueList = new ArrayList<KeyValue>();
         for (NavigableMap.Entry<byte[], NavigableMap<byte[], NavigableMap<Long, byte[]>>> fe : objToMap(obj).entrySet()) {
@@ -433,12 +444,12 @@ public class HBObjectMapper {
 
     private <T extends HBRecord> T readValueFromResult(Result result, Class<T> clazz) {
         if (isResultEmpty(result)) return null;
-        return mapToObj(result.getRow(), result.getMap(), clazz);
+        return mapToObj(new RowKey(result.getRow()), result.getMap(), clazz);
     }
 
     private <T extends HBRecord> T readValueFromRowAndResult(byte[] rowKey, Result result, Class<T> clazz) {
         if (isResultEmpty(result)) return null;
-        return mapToObj(rowKey, result.getMap(), clazz);
+        return mapToObj(new RowKey(rowKey), result.getMap(), clazz);
     }
 
     private void objectSetFieldValue(Object obj, Field field, NavigableMap<Long, byte[]> columnValuesVersioned, boolean serializeAsString) {
@@ -520,7 +531,7 @@ public class HBObjectMapper {
         if (rowKeyBytes == null)
             return readValueFromPut(put, clazz);
         else
-            return readValueFromRowAndPut(rowKeyBytes.get(), put, clazz);
+            return readValueFromRowAndPut(new RowKey(rowKeyBytes.get()), put, clazz);
     }
 
 
@@ -532,14 +543,14 @@ public class HBObjectMapper {
      * @param clazz  {@link Class} to which you want to convert to (must extend {@link HBRecord} class)
      * @return Bean-like object
      */
-    public <T extends HBRecord> T readValue(String rowKey, Put put, Class<T> clazz) {
-        if (rowKey == null)
+    public <T extends HBRecord> T readValue(RowKey rowKey, Put put, Class<T> clazz) {
+        if (rowKey == null || rowKey.bytes() == null)
             return readValueFromPut(put, clazz);
         else
-            return readValueFromRowAndPut(Bytes.toBytes(rowKey), put, clazz);
+            return readValueFromRowAndPut(rowKey, put, clazz);
     }
 
-    private <T extends HBRecord> T readValueFromRowAndPut(byte[] rowKey, Put put, Class<T> clazz) {
+    private <T extends HBRecord> T readValueFromRowAndPut(RowKey rowKey, Put put, Class<T> clazz) {
         Map<byte[], List<KeyValue>> rawMap = put.getFamilyMap();
         NavigableMap<byte[], NavigableMap<byte[], NavigableMap<Long, byte[]>>> map = new TreeMap<byte[], NavigableMap<byte[], NavigableMap<Long, byte[]>>>(Bytes.BYTES_COMPARATOR);
         for (Map.Entry<byte[], List<KeyValue>> familyNameAndColumnValues : rawMap.entrySet()) {
@@ -563,7 +574,7 @@ public class HBObjectMapper {
         if (put == null || put.isEmpty() || put.getRow() == null || put.getRow().length == 0) {
             return null;
         }
-        return readValueFromRowAndPut(put.getRow(), put, clazz);
+        return readValueFromRowAndPut(new RowKey(put.getRow()), put, clazz);
     }
 
     /**
@@ -595,13 +606,22 @@ public class HBObjectMapper {
         return new ImmutableBytesWritable(composeRowKey(obj));
     }
 
-    private static byte[] composeRowKey(HBRecord obj) {
+    private static byte[] composeRowKey(HBRecord obj) throws RowKeyCantBeComposedException, RowKeyCantBeEmptyException, HBRowKeyFieldCantBeNullException {
         byte[] rowKey;
-        try {
+
+        try{
             rowKey = obj.composeRowKey();
+        }catch(RowKeyCantBeComposedException e){
+            throw e;
+        } catch(RowKeyCantBeEmptyException e ){
+            throw e;
+        } catch(HBRowKeyFieldCantBeNullException e) {
+            throw e;
         } catch (Exception ex) {
             throw new RowKeyCantBeComposedException(ex);
         }
+
+
         if (rowKey == null || rowKey.length == 0) {
             throw new RowKeyCantBeEmptyException();
         }

@@ -21,39 +21,6 @@ import java.util.*;
  */
 public abstract class AbstractHBDAO<T extends HBRecord> {
 
-    public static class RowKey implements Comparable<RowKey> {
-        static Bytes.ByteArrayComparator comparator = new Bytes.ByteArrayComparator();
-        private final byte[] key;
-        public RowKey(byte[] key) {
-            this.key = key;
-        }
-
-        public byte[] bytes() {
-            return key;
-        }
-
-        @Override
-        public boolean equals(Object other)
-        {
-            if (!(other instanceof RowKey))
-            {
-                return false;
-            }
-            return Arrays.equals(key, ((RowKey)other).key);
-        }
-
-        @Override
-        public int hashCode()
-        {
-            return Arrays.hashCode(key);
-        }
-
-        @Override
-        public int compareTo(RowKey other) {
-            return comparator.compare(key, other.bytes());
-        }
-    }
-
     public static final int DEFAULT_NUM_VERSIONS = 1;
     protected static final HBObjectMapper hbObjectMapper = new HBObjectMapper();
     protected final HTable hTable;

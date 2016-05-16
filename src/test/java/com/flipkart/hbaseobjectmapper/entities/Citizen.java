@@ -1,6 +1,8 @@
 package com.flipkart.hbaseobjectmapper.entities;
 
 import com.flipkart.hbaseobjectmapper.*;
+import com.flipkart.hbaseobjectmapper.exceptions.HBRowKeyFieldCantBeNullException;
+import com.flipkart.hbaseobjectmapper.exceptions.RowKeyCouldNotBeParsedException;
 import lombok.EqualsAndHashCode;
 import lombok.ToString;
 import org.apache.commons.lang.ArrayUtils;
@@ -95,7 +97,16 @@ public class Citizen implements HBRecord {
         this.pincode = pincode;
     }
 
-    public byte[] composeRowKey() {
+    public byte[] composeRowKey() throws HBRowKeyFieldCantBeNullException{
+        // Check for null row key values. Nulls should produce HBRowKeyFieldCantBeNullException
+        if(countryCode == null) {
+            throw new HBRowKeyFieldCantBeNullException("Row key field countryCode can't be null");
+        }
+
+        if(uid == null) {
+            throw new HBRowKeyFieldCantBeNullException("Row key field uid can't be null");
+        }
+
         byte[] key = null;
         List<byte[]> parts = new ArrayList<byte[]>();
         parts.add(countryCode.getBytes());
@@ -110,11 +121,14 @@ public class Citizen implements HBRecord {
 
     public void parseRowKey(byte[] rowKeyBytes) {
         List<byte[]> tokens = splitTokens(rowKeyBytes, KEY_DELIM.getBytes());
-        if(tokens.size() == 2) {
+        final int nTokens = tokens.size();
+        if(nTokens == 2) {
             this.countryCode = Bytes.toString(tokens.get(0));
             this.uid = Bytes.toInt(tokens.get(1));
+        } else {
+            String msg = "Parsed " + nTokens + " tokens";
+            throw new RowKeyCouldNotBeParsedException(msg, null);
         }
-        System.out.println('.');
     }
 
     // Getter methods:
